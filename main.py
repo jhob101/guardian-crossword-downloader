@@ -1,13 +1,14 @@
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 import urllib.request
-from datetime import date
 import datetime
 import os
 from dotenv import load_dotenv
 
+
 def get_today_date():
-    return date.today()
+    now = datetime.datetime.now(datetime.timezone.utc)
+    return now.date()
 
 
 def get_yesterday_date(today):
@@ -42,6 +43,7 @@ def get_save_path(directory):
         os.makedirs(crosswords_directory)
 
     return crosswords_directory
+
 
 def delete_file(file_path):
     if os.path.isfile(file_path):
