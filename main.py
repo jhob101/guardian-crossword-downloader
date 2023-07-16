@@ -4,26 +4,28 @@ import urllib.request
 from datetime import date
 import datetime
 import os
-
+from dotenv import load_dotenv
 
 def get_today_date():
     return date.today()
-
-
-def format_date_string(date_obj):
-    return date_obj.strftime("%Y%m%d")
-
-
-def get_now():
-    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def get_yesterday_date(today):
     return today.replace(day=today.day - 1)
 
 
-def format_yesterday_string(prefix, yesterday):
-    return prefix + yesterday.strftime("%Y%m%d")
+# Get datetime in format YYYY-MM-DD HH:MM:SS
+def get_now():
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+# Get date in format YYYYMMDD
+def format_date_string(date_obj):
+    return date_obj.strftime("%Y%m%d")
+
+
+def get_filename(prefix, date_obj):
+    return prefix + format_date_string(date_obj) + ".pdf"
 
 
 def set_working_directory():
@@ -84,36 +86,63 @@ def upload_file_to_drive(drive, parent_id, file_name, save_path):
     print(get_now() + " - File uploaded to GDrive: ", file_name)
 
 
+def get_prefix(day):
+    if day.weekday() == 6:  # if Sunday, get the Observer speedy crossword
+        prefix = "obs.speedy."
+    else:  # otherwise get the Guardian quick crossword
+        prefix = "gdn.quick."
+    return prefix
+
+
+def clean_files_on_date(current_working_directory, date_to_remove):
+    prefix = get_prefix(date_to_remove)
+    yesterday_filename = get_filename(prefix, date_to_remove)
+    save_path = get_save_path(current_working_directory)
+    # if file exists locally, delete it
+    if check_file_exists(save_path + yesterday_filename):
+        delete_file(save_path + yesterday_filename)
+        return True
+    return False
+
+
 def main():
-    prefix = "gdn.quick."
-    today = get_today_date()
-    date_string = format_date_string(today)
-    now = get_now()
-    yesterday = get_yesterday_date(today)
-    yesterday_string = format_yesterday_string(prefix, yesterday)
+    load_dotenv()
+    # Set up variables
+    now = get_now()  # Used for logging
+
     current_working_directory = set_working_directory()
     save_path = get_save_path(current_working_directory)
-    file_name = prefix + date_string + ".pdf"
 
-    delete_file(save_path + yesterday_string + ".pdf")
+    today = get_today_date()
+    today_filename = get_filename(get_prefix(today), today)
 
-    if check_file_exists(save_path + file_name):
+    # Check if file exists locally
+    if check_file_exists(save_path + today_filename):
         print(now + " - File already exists locally")
-        exit()
+    else:  # Download file
+        print(now + " - File does not exist locally, downloading...")
+        download_host = "https://crosswords-static.guim.co.uk/"
+        download_file(download_host, save_path, today_filename)
 
-    download_url = "https://crosswords-static.guim.co.uk/"
-    download_file(download_url, save_path, file_name)
-
+    # Check if file exists in GDrive
     gauth = authenticate()
     drive = get_drive_instance(gauth)
 
-    parent_id = '18D_PklYFxR-Kfgugq_c8nNRpRoOseZ_z'
-    file_id = check_file_exists_in_drive(drive, parent_id, file_name)
+    # parent_id = '18D_PklYFxR-Kfgugq_c8nNRpRoOseZ_z'
+    # Get parent directory from .env file
+    parent_id = os.getenv('GDRIVE_DIRECTORY')
 
-    if file_id is None:
-        upload_file_to_drive(drive, parent_id, file_name, save_path)
+    file_id = check_file_exists_in_drive(drive, parent_id, today_filename)
+
+    if file_id is None:  # Upload file to GDrive
+        upload_file_to_drive(drive, parent_id, today_filename, save_path)
     else:
-        print(now + " - File already exists in GDrive: ", file_name)
+        print(now + " - File already exists in GDrive: ", today_filename)
+
+    # Clean up files
+    yesterday = get_yesterday_date(today)
+    if clean_files_on_date(current_working_directory, yesterday):
+        print(get_now() + " - Deleted file: ", get_filename(get_prefix(yesterday), yesterday))
 
 
 if __name__ == '__main__':
