@@ -49,6 +49,8 @@ Run every hour between 00:30 and 06:30 (just in case it fails on earlier run)
 30 0-6 * * * python3 /home/pi/Python_Code/guardian-crossword-downloader/main.py
 ```
 
+I run it on an always-on RaspberryPi.
+
 ## All Set!
 
 From then on the script should chug away happily downloading the crosswords to your Google Drive.
