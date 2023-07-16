@@ -33,8 +33,15 @@ def set_working_directory():
 
 
 def get_save_path(directory):
-    return directory + '/crosswords/'
+    sub_directory = '/crosswords/'
+    crosswords_directory = directory + sub_directory
 
+    # if directory does not exist, create it
+    if not os.path.exists(crosswords_directory):
+        print(get_now() + " - Creating directory: ", crosswords_directory)
+        os.makedirs(crosswords_directory)
+
+    return crosswords_directory
 
 def delete_file(file_path):
     if os.path.isfile(file_path):
