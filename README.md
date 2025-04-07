@@ -41,6 +41,8 @@ python main.py
 
 When first run you will be prompted to authenticate with Google.  Credentials will then be saved to `credentials.txt` so that authentication is not required every time the script is run.
 
+The script will also create a `/crosswords` sub-directory to save the last downloaded crossword to.
+
 ## Setup as cron
 
 Run every hour between 00:30 and 06:30 (just in case it fails on earlier run)
