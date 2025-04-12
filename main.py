@@ -67,13 +67,18 @@ def authenticate():
     current_working_directory = set_working_directory()
 
     gauth.LoadCredentialsFile(current_working_directory + "/credentials.txt")
+    #gauth.LoadCredentialsFile(current_working_directory + "/client_secrets.json")
     if gauth.credentials is None:
         gauth.LocalWebserverAuth()
+        gauth.SaveCredentialsFile(current_working_directory + "/credentials.txt")
     elif gauth.access_token_expired:
+        print(get_now() + " - Credentials expired")
         gauth.Refresh()
+        gauth.SaveCredentialsFile(current_working_directory + "/credentials.txt")
     else:
+        print(get_now() + " - Credentials already exist")
         gauth.Authorize()
-    gauth.SaveCredentialsFile(current_working_directory + "/credentials.txt")
+
     return gauth
 
 
