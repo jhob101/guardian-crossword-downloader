@@ -66,15 +66,16 @@ def authenticate():
     gauth = GoogleAuth()
     current_working_directory = set_working_directory()
 
-    gauth.LoadCredentialsFile(current_working_directory + "/credentials.txt")
-    #gauth.LoadCredentialsFile(current_working_directory + "/client_secrets.json")
+    gauth.LoadCredentialsFile(current_working_directory + "/credentials.json")
+    print (get_now() + " - Checking credentials for: " + current_working_directory + "/credentials.json")
     if gauth.credentials is None:
+        print(get_now() + " - No credentials found, requesting user to log in")
         gauth.LocalWebserverAuth()
-        gauth.SaveCredentialsFile(current_working_directory + "/credentials.txt")
+        gauth.SaveCredentialsFile(current_working_directory + "/credentials.json")
     elif gauth.access_token_expired:
         print(get_now() + " - Credentials expired")
         gauth.Refresh()
-        gauth.SaveCredentialsFile(current_working_directory + "/credentials.txt")
+        # gauth.SaveCredentialsFile(current_working_directory + "/credentials.json")
     else:
         print(get_now() + " - Credentials already exist")
         gauth.Authorize()
