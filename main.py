@@ -71,13 +71,13 @@ def authenticate():
     if gauth.credentials is None:
         print(get_now() + " - No credentials found, requesting user to log in")
         gauth.LocalWebserverAuth()
-        gauth.SaveCredentialsFile(current_working_directory + "/credentials.json")
+        if not os.path.exists(current_working_directory + "credentials.json"):
+          gauth.SaveCredentialsFile(current_working_directory + "/credentials.json")
     elif gauth.access_token_expired:
-        print(get_now() + " - Credentials expired")
+        print(get_now() + " - Token expired, refreshing...")
         gauth.Refresh()
-        # gauth.SaveCredentialsFile(current_working_directory + "/credentials.json")
     else:
-        print(get_now() + " - Credentials already exist")
+        print(get_now() + " - Credentials exist, authorising...")
         gauth.Authorize()
 
     return gauth
