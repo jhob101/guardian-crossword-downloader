@@ -110,15 +110,57 @@ def get_crossword_type_key(day):
     return key
 
 
-def clean_files_on_date(current_working_directory, date_to_remove):
-    prefix = get_crossword_type_key(date_to_remove)
-    yesterday_filename = rewrite_filename(get_remote_filename(prefix, date_to_remove))
-    save_path = get_save_path(current_working_directory)
-    # if file exists locally, delete it
-    if check_file_exists(save_path + yesterday_filename):
-        delete_file(save_path + yesterday_filename)
-        return True
-    return False
+# Clean up old files that are confirmed to be on Google Drive
+def cleanup_old_synced_files(drive, parent_id, save_path, today_date_obj):
+    print(get_now() + " - Starting cleanup of old, synced files...")
+    today_str = format_date_string(today_date_obj) # YYYYMMDD format for comparison
+    deleted_count = 0
+
+    # List files in the local save directory
+    try:
+        local_files = [f for f in os.listdir(save_path) if os.path.isfile(os.path.join(save_path, f))]
+    except FileNotFoundError:
+        print(get_now() + f" - Error: Local save path not found: {save_path}")
+        return
+
+    # Get list of files in Google Drive target folder for efficient checking
+    drive_files = {}
+    try:
+        file_list = drive.ListFile({'q': f"'{parent_id}' in parents and trashed=false"}).GetList()
+        for drive_file in file_list:
+            drive_files[drive_file['title']] = drive_file['id']
+    except Exception as e:
+        print(get_now() + f" - Error listing files in Google Drive folder {parent_id}: {e}")
+        # Decide if we should proceed without Drive confirmation or stop
+        print(get_now() + " - Stopping cleanup due to GDrive error.")
+        return
+
+
+    for filename in local_files:
+        # Basic check: Is it a PDF? Does it look like YYYYMMDD.<rest>.pdf?
+        if filename.lower().endswith('.pdf') and len(filename) > 13 and filename[:8].isdigit():
+            file_date_str = filename[:8]
+
+            # Check 1: Is the file from a date *before* today?
+            if file_date_str < today_str:
+                file_path = os.path.join(save_path, filename)
+
+                # Check 2: Does this file exist in Google Drive?
+                if filename in drive_files:
+                    print(get_now() + f" - Found old file '{filename}' locally and in GDrive. Deleting local copy.")
+                    try:
+                        delete_file(file_path)
+                        deleted_count += 1
+                    except Exception as e:
+                        print(get_now() + f" - Error deleting local file {filename}: {e}")
+                # else: # Optional: Log if an old local file is NOT found in Drive
+                #     print(get_now() + f" - Found old local file '{filename}' but it's NOT in GDrive. Keeping local copy.")
+
+    if deleted_count > 0:
+        print(get_now() + f" - Cleanup finished. Deleted {deleted_count} old local file(s).")
+    else:
+        print(get_now() + " - Cleanup finished. No old local files needed deletion.")
+
 
 import os
 
@@ -173,11 +215,10 @@ def main():
     else:
         print(now + " - File already exists in GDrive: ", local_today_filename)
 
-    # Clean up files
-    yesterday = get_yesterday_date(today)
-    if clean_files_on_date(current_working_directory, yesterday):
-        print(get_now() + " - Deleted file: ", rewrite_filename(get_remote_filename(get_crossword_type_key(yesterday), yesterday)))
+    # --- Updated Cleanup Logic ---
+    # Instead of cleaning just yesterday, clean all old files found in GDrive
+    cleanup_old_synced_files(drive, parent_id, save_path, today)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
