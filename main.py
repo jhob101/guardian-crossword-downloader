@@ -1,4 +1,4 @@
-from pydrive.auth import GoogleAuth
+from pydrive.auth import GoogleAuth, AuthError
 from pydrive.drive import GoogleDrive
 import urllib.request
 import datetime
@@ -64,21 +64,61 @@ def download_file(url, file_name, save_path, local_filename):
 
 def authenticate():
     gauth = GoogleAuth()
-    current_working_directory = set_working_directory()
+    credentials_path = os.path.join(set_working_directory(), "credentials.json")
+    print(get_now() + f" - Checking credentials file: {credentials_path}")
 
-    gauth.LoadCredentialsFile(current_working_directory + "/credentials.json")
-    print (get_now() + " - Checking credentials for: " + current_working_directory + "/credentials.json")
+    # Attempt to load existing credentials
+    try:
+        gauth.LoadCredentialsFile(credentials_path)
+    except Exception as e: # Catch potential issues during load (e.g., file corrupt)
+        print(get_now() + f" - Warning: Could not load credentials file: {e}. Will attempt to re-authenticate.")
+        gauth.credentials = None # Ensure we trigger re-auth
+
     if gauth.credentials is None:
-        print(get_now() + " - No credentials found, requesting user to log in")
-        gauth.LocalWebserverAuth()
-        if not os.path.exists(current_working_directory + "credentials.json"):
-          gauth.SaveCredentialsFile(current_working_directory + "/credentials.json")
+        print(get_now() + " - No valid credentials found, attempting interactive login...")
+        try:
+            gauth.LocalWebserverAuth() # This blocks until flow is complete or fails
+            print(get_now() + " - Interactive login successful.")
+            # Save credentials ONLY after successful authentication
+            gauth.SaveCredentialsFile(credentials_path)
+            print(get_now() + f" - Credentials saved to {credentials_path}")
+        except AuthError as e:
+            print(get_now() + f" - ERROR: Google Drive Authentication failed during interactive login: {e}")
+            print(get_now() + " - Please check your network connection and browser pop-up settings.")
+            print(get_now() + " - Exiting due to authentication failure.")
+            exit(1) # Exit script if auth fails critically
+        except Exception as e: # Catch other potential errors during auth
+            print(get_now() + f" - ERROR: An unexpected error occurred during interactive login: {e}")
+            print(get_now() + " - Exiting due to authentication failure.")
+            exit(1)
+
     elif gauth.access_token_expired:
-        print(get_now() + " - Token expired, refreshing...")
-        gauth.Refresh()
+        print(get_now() + " - Credentials expired, attempting to refresh...")
+        try:
+            gauth.Refresh()
+            print(get_now() + " - Credentials refreshed successfully.")
+            # Save the refreshed credentials
+            gauth.SaveCredentialsFile(credentials_path)
+            print(get_now() + f" - Refreshed credentials saved to {credentials_path}")
+        except AuthError as e: # Catch specific refresh errors
+            print(get_now() + f" - ERROR: Failed to refresh Google Drive credentials: {e}")
+            print(get_now() + " - This might require re-authentication.")
+            # Optionally: Delete the invalid credentials file to force re-auth next time?
+            # try:
+            #     os.remove(credentials_path)
+            #     print(get_now() + " - Removed potentially invalid credentials file.")
+            # except OSError as del_e:
+            #     print(get_now() + f" - Warning: Could not remove credentials file {credentials_path}: {del_e}")
+            print(get_now() + " - Exiting due to authentication failure.")
+            exit(1) # Exit script if refresh fails
+        except Exception as e: # Catch other potential errors during refresh
+             print(get_now() + f" - ERROR: An unexpected error occurred during credential refresh: {e}")
+             print(get_now() + " - Exiting due to authentication failure.")
+             exit(1)
     else:
-        print(get_now() + " - Credentials exist, authorising...")
-        gauth.Authorize()
+        print(get_now() + " - Credentials valid, proceeding.")
+        # No need to Authorize() here, PyDrive handles it implicitly when making calls
+        # gauth.Authorize() # This call is often redundant
 
     return gauth
 
@@ -153,8 +193,8 @@ def cleanup_old_synced_files(drive, parent_id, save_path, today_date_obj):
                         deleted_count += 1
                     except Exception as e:
                         print(get_now() + f" - Error deleting local file {filename}: {e}")
-                # else: # Optional: Log if an old local file is NOT found in Drive
-                #     print(get_now() + f" - Found old local file '{filename}' but it's NOT in GDrive. Keeping local copy.")
+                else: # Optional: Log if an old local file is NOT found in Drive
+                    print(get_now() + f" - Found old local file '{filename}' but it's NOT in GDrive. Keeping local copy.")
 
     if deleted_count > 0:
         print(get_now() + f" - Cleanup finished. Deleted {deleted_count} old local file(s).")
@@ -215,8 +255,6 @@ def main():
     else:
         print(now + " - File already exists in GDrive: ", local_today_filename)
 
-    # --- Updated Cleanup Logic ---
-    # Instead of cleaning just yesterday, clean all old files found in GDrive
     cleanup_old_synced_files(drive, parent_id, save_path, today)
 
 
